@@ -1,12 +1,12 @@
 using System;
 
-namespace LightMessager.DAL
+namespace LightMessager.DAL.Model
 {
     /// <summary>
     /// LightMessager专用消息落地表实体
     /// </summary>
     [Serializable]
-    internal class MessageQueue
+    public class MessageQueue
 	{
 		public MessageQueue()
 		{}

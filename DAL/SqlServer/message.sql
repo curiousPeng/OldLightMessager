@@ -1,4 +1,4 @@
-﻿SET ANSI_NULLS ON
+SET ANSI_NULLS ON
 GO
 
 SET QUOTED_IDENTIFIER ON
@@ -52,5 +52,3 @@ GO
 
 EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'LightMessager专用消息落地表' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'MessageQueue'
 GO
-
-

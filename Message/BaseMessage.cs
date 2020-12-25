@@ -7,9 +7,6 @@ namespace LightMessager.Message
     {
         internal long MsgHash { set; get; }
 
-        /// <summary>
-        /// 请使用唯一值，否则只有一条会成功
-        /// </summary>
         [JsonIgnore]
         public string Source { set; get; }
 
@@ -28,8 +25,11 @@ namespace LightMessager.Message
 
         internal DateTime LastRetryTime { set; get; }
 
+        /// <summary>
+        /// 重试的时候会用到
+        /// </summary>
         [JsonIgnore]
-        internal string Pattern { set; get; }
+        internal string routeKey { set; get; }
 
         public DateTime CreatedTime { set; get; }
     }

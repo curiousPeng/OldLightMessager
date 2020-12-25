@@ -11,10 +11,11 @@ namespace LightMessager.Pool
         private IModel _internalChannel;
         private ObjectPool<IPooledWapper> _pool;
         private Dictionary<ulong, long> _unconfirm;
+        private IMessageQueueHelper _message_queue_helper;
         public DateTime LastGetTime { set; get; }
         public IModel Channel { get { return this._internalChannel; } }
 
-        public PooledChannel(IModel channel, ObjectPool<IPooledWapper> pool)
+        public PooledChannel(IModel channel, ObjectPool<IPooledWapper> pool,IMessageQueueHelper messageQueueHelper)
         {
             _pool = pool;
             _unconfirm = new Dictionary<ulong, long>();
@@ -24,6 +25,7 @@ namespace LightMessager.Pool
             _internalChannel.BasicAcks += Channel_BasicAcks;
             _internalChannel.BasicNacks += Channel_BasicNacks;
             _internalChannel.ModelShutdown += Channel_ModelShutdown;
+            _message_queue_helper = messageQueueHelper;
         }
 
         internal void PreRecord(long msgHash)
@@ -43,7 +45,7 @@ namespace LightMessager.Pool
             long msgHash = 0;
             if (_unconfirm.TryGetValue(e.DeliveryTag, out msgHash))
             {
-                var ok = MessageQueueHelper.Update(
+                var ok = _message_queue_helper.Update(
                     msgHash,
                     fromStatus1: MsgStatus.Created, // 之前的状态只能是1 Created 或者2 Retry
                     fromStatus2: MsgStatus.Retrying,

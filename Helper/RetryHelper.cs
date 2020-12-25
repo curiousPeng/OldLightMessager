@@ -18,7 +18,7 @@ namespace LightMessager.Helper
                 {
                     return retryme();
                 }
-                catch (Exception ex)
+                catch
                 {
                     if (tries >= retries)
                     {
