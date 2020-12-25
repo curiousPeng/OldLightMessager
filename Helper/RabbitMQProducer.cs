@@ -148,7 +148,7 @@ namespace LightMessager.Helper
 
                 var exchange = string.Empty;
                 var queue = string.Empty;
-                if (!string.IsNullOrEmpty(exchange) && !string.IsNullOrEmpty(queue))
+                if (!string.IsNullOrEmpty(exchange) && !string.IsNullOrEmpty(queue) && !string.IsNullOrEmpty(routeKey))
                 {
                     exchange = exchangeName;
                     queue = queueName;
@@ -219,15 +219,15 @@ namespace LightMessager.Helper
 
                 var exchange = string.Empty;
                 var queue = string.Empty;
-                if (!string.IsNullOrEmpty(exchange) && !string.IsNullOrEmpty(queue))
+                if (!string.IsNullOrEmpty(exchangeName) && !string.IsNullOrEmpty(queueName))
                 {
                     exchange = exchangeName;
                     queue = queueName;
-                    TopicEnsureQueue(channel, ref exchange, routeKey, ref queue, delaySend);
+                    TopicEnsureQueue(channel, routeKey, ref exchange, ref queue, delaySend);
                 }
                 else
                 {
-                    TopicEnsureQueue(channel, messageType, out exchange, routeKey, out queue, delaySend);
+                    TopicEnsureQueue(channel, messageType, routeKey, out exchange, out queue, delaySend);
                 }
 
                 var json = JsonConvert.SerializeObject(message);
@@ -285,7 +285,7 @@ namespace LightMessager.Helper
                 // pooled.PreRecord(message.MsgHash);无需修改状态了
 
                 var exchange = string.Empty;
-                if (string.IsNullOrEmpty(exchange))
+                if (string.IsNullOrEmpty(exchangeName) ||  string.IsNullOrEmpty(queueName))
                 {
                     FanoutEnsureQueue(channel, messageType, out exchange, delaySend);
                 }
@@ -431,7 +431,9 @@ namespace LightMessager.Helper
                 exchange = exchange + ".delay";
                 queue = queue + ".delay";
             }
-            key = exchange;
+            key = queue;///为什么这儿是queue，而上面是exchange，因为上面是工具定义的，
+            ///只要是同一个消息结构，queueName是定死了，所以直接返回Exchange就行了
+            ///而下面是用户自定义的queue，同一个exchange下可以有多个不同的queue，绑定就不同
             if (!dict_info_custom.ContainsKey(key))
             {
                 GetQueueInfoForCustom(key, exchange, queue, routeKey);
@@ -452,14 +454,15 @@ namespace LightMessager.Helper
             }
         }
 
-        private static void TopicEnsureQueue(IModel channel, Type messageType, out string exchange, string routeKey, out string queue, int delaySend = 0)
+        private static void TopicEnsureQueue(IModel channel, Type messageType, string routeKey, out string exchange, out string queue, int delaySend = 0)
         {
             var type = messageType;
             if (delaySend > 0)
             {//走新加延迟队列
                 var type_name = messageType.IsGenericType ? messageType.GenericTypeArguments[0].Name : messageType.Name;
-                var key = string.Format("{0}{1}{2}", "topic.", type_name, ".exchange.delay");
-                exchange = key;
+                var key = routeKey;///为什么direct模式用Queue，而这里这里又用routekey
+                                   ///因为topic模式唯一指定的就是routekey，其他的都不定
+                exchange = string.Format("{0}{1}{2}", "topic.", type_name, ".exchange.delay");
                 queue = type_name + ".input.delay";
                 if (!dict_info_custom.ContainsKey(key))
                 {
@@ -486,7 +489,7 @@ namespace LightMessager.Helper
                 }
             }
         }
-        private static void TopicEnsureQueue(IModel channel, ref string exchange, string routeKey, ref string queue, int delaySend = 0)
+        private static void TopicEnsureQueue(IModel channel, string routeKey, ref string exchange, ref string queue, int delaySend = 0)
         {
             string realExchange = exchange;
             if (delaySend > 0)
@@ -494,7 +497,7 @@ namespace LightMessager.Helper
                 exchange = exchange + ".delay";
                 queue = queue + ".delay";
             }
-            var key = exchange;
+            var key = routeKey;
             if (!dict_info_custom.ContainsKey(key))
             {
                 GetQueueInfoForCustom(key, exchange, queue, routeKey);
@@ -523,7 +526,7 @@ namespace LightMessager.Helper
             {
                 var type_name = messageType.IsGenericType ? messageType.GenericTypeArguments[0].Name : messageType.Name;
                 var key = string.Format("{0}{1}{2}", "fanout.", type_name, ".exchange.delay");
-                exchange = key;
+                exchange = key;///同direct模式
                 var queue = type_name + ".input.delay";
                 if (!dict_info_custom.ContainsKey(key))
                 {
@@ -556,7 +559,7 @@ namespace LightMessager.Helper
                 exchange = exchange + ".delay";
                 queue = queue + ".delay";
             }
-            var key = exchange;
+            var key = queue;
             if (!dict_info_custom.ContainsKey(key))
             {
                 GetQueueInfoForCustom(key, exchange, queue, "");
