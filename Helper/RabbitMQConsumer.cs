@@ -144,7 +144,7 @@ namespace LightMessager.Helper
 
                 var exchange = string.Empty;
                 var queue = string.Empty;
-                if (!string.IsNullOrEmpty(exchange) && !string.IsNullOrEmpty(queue) && !string.IsNullOrEmpty(routeKey))
+                if (!string.IsNullOrEmpty(exchangeName) && !string.IsNullOrEmpty(queueName) && !string.IsNullOrEmpty(routeKey))
                 {
                     exchange = exchangeName;
                     queue = queueName;
@@ -296,7 +296,7 @@ namespace LightMessager.Helper
         /// </summary>
         /// <typeparam name="TMessage">消息类型</typeparam>
         /// <typeparam name="THandler">消息处理器类型</typeparam>
-        public void RegisterFanoutHandler<TMessage, THandler>(string exchangeName = "", string queueName = "", bool redeliveryCheck = false)
+        public void RegisterFanoutHandler<TMessage, THandler>(string exchangeName = "", bool redeliveryCheck = false)
             where THandler : BaseHandleMessages<TMessage>
             where TMessage : BaseMessage
         {
@@ -308,15 +308,14 @@ namespace LightMessager.Helper
                 var consumer = new EventingBasicConsumer(channel);
 
                 var exchange = string.Empty;
-                var queue = string.Empty;
-                if (!string.IsNullOrEmpty(exchangeName) && !string.IsNullOrEmpty(queueName))
+                if (!string.IsNullOrEmpty(exchangeName))
                 {
                     exchange = exchangeName;
-                    EnsureQueue.FanoutEnsureQueue(channel, ref exchange, ref queueName);
+                    EnsureQueue.FanoutEnsureQueue(channel, ref exchange);
                 }
                 else
                 {
-                    EnsureQueue.FanoutEnsureQueue(channel, type, out exchange, out queue);
+                    EnsureQueue.FanoutEnsureQueue(channel, type, out exchange);
                 }
                 TMessage msg = null;//闭包获取数据
                 try
@@ -333,8 +332,10 @@ namespace LightMessager.Helper
                     _message_queue_helper.UpdateCanbeRemoveIsFalse(msg.MsgHash);
                     _logger.Error("RegisterHandler()出错，异常：" + ex.Message + "；堆栈：" + ex.StackTrace);
                 }
-
-                channel.BasicConsume(queue, true, consumer);
+                //将这个队列绑定（bind）到交换机上面
+                var queueName = channel.QueueDeclare().QueueName;
+                channel.QueueBind(queue: queueName, exchange: exchange, routingKey: "");
+                channel.BasicConsume(queueName, true, consumer);
             }
             catch (Exception ex)
             {

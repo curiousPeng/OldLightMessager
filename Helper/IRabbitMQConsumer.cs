@@ -9,6 +9,6 @@ namespace LightMessager.Helper
     {
         void RegisterDirectHandler<TMessage, THandler>(string exchangeName, string queueName, string routeKey, bool redeliveryCheck = false) where THandler : BaseHandleMessages<TMessage> where TMessage : BaseMessage;
         void RegisterTopicHandler<TMessage, THandler>(string routeKey, string exchangeName, string queueName, bool redeliveryCheck = false, params string[] subscribePatterns) where THandler : BaseHandleMessages<TMessage> where TMessage : BaseMessage;
-        void RegisterFanoutHandler<TMessage, THandler>(string exchangeName, string queueName, bool redeliveryCheck = false) where THandler : BaseHandleMessages<TMessage> where TMessage : BaseMessage;
+        void RegisterFanoutHandler<TMessage, THandler>(string exchangeName, bool redeliveryCheck = false) where THandler : BaseHandleMessages<TMessage> where TMessage : BaseMessage;
     }
 }

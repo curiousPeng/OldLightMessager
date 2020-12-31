@@ -144,7 +144,7 @@ namespace LightMessager.Helper
 
                 var exchange = string.Empty;
                 var queue = string.Empty;
-                if (!string.IsNullOrEmpty(exchange) && !string.IsNullOrEmpty(queue) && !string.IsNullOrEmpty(routeKey))
+                if (!string.IsNullOrEmpty(exchangeName) && !string.IsNullOrEmpty(queueName) && !string.IsNullOrEmpty(routeKey))
                 {
                     exchange = exchangeName;
                     queue = queueName;
@@ -284,11 +284,11 @@ namespace LightMessager.Helper
                 if (!string.IsNullOrEmpty(exchangeName) && !string.IsNullOrEmpty(queueName))
                 {
                     exchange = exchangeName;
-                    EnsureQueue.FanoutEnsureQueue(channel, ref exchange, ref queueName, delaySend);
+                    EnsureQueue.FanoutEnsureQueue(channel, ref exchange, delaySend);
                 }
                 else
                 {
-                    EnsureQueue.FanoutEnsureQueue(channel, messageType, out exchange, out _, delaySend);
+                    EnsureQueue.FanoutEnsureQueue(channel, messageType, out exchange, delaySend);
                 }
                 var json = JsonConvert.SerializeObject(message);
                 var bytes = Encoding.UTF8.GetBytes(json);
