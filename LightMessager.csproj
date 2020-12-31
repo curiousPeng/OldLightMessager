@@ -5,6 +5,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="DAL\**" />
+    <Compile Remove="RabbitMQ-sample\**" />
+    <Compile Remove="sample\**" />
+    <Compile Remove="Test-Sample\**" />
+    <EmbeddedResource Remove="DAL\**" />
+    <EmbeddedResource Remove="RabbitMQ-sample\**" />
+    <EmbeddedResource Remove="sample\**" />
+    <EmbeddedResource Remove="Test-Sample\**" />
+    <None Remove="DAL\**" />
+    <None Remove="RabbitMQ-sample\**" />
+    <None Remove="sample\**" />
+    <None Remove="Test-Sample\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Dapper" Version="2.0.78" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="2.1.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="2.1.1" />

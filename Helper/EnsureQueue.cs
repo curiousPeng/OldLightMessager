@@ -41,14 +41,20 @@ namespace LightMessager.Helper
             }
             else
             {
-                var info = GetQueueInfo(type);
-                exchange = info.Exchange;
-                queue = info.Queue;
                 if (!dict_info.ContainsKey(type))
                 {
+                    var info = GetQueueInfo(type);//不能放外面，这个方法会往dict_info里面记录，否则永远建不起exchange
+                    exchange = info.Exchange;
+                    queue = info.Queue;
                     channel.ExchangeDeclare(exchange, ExchangeType.Direct, durable: true);
                     channel.QueueDeclare(queue, durable: true, exclusive: false, autoDelete: false);
                     channel.QueueBind(queue, exchange, queue);
+                }
+                else
+                {
+                    var info = GetQueueInfo(type);
+                    exchange = info.Exchange;
+                    queue = info.Queue;
                 }
             }
         }
@@ -63,7 +69,7 @@ namespace LightMessager.Helper
                 queue = queue + ".delay";
             }
             key = queue;///为什么这儿是queue，而上面是exchange，因为上面是工具定义的，
-                        ///只要是同一个消息结构，queueName是定死了，所以直接返回Exchange就行了
+                        ///只要是同一个消息结构，上面的queueName是定死了，所以直接返回Exchange就行了
                         ///而下面是用户自定义的queue，同一个exchange下可以有多个不同的queue，绑定就不同
             if (!dict_info_custom.ContainsKey(key))
             {
@@ -109,14 +115,20 @@ namespace LightMessager.Helper
             }
             else
             {
-                var info = GetQueueInfo(type);
-                exchange = "topic." + info.Exchange;
-                queue = info.Queue;
                 if (!dict_info.ContainsKey(type))
                 {
+                    var info = GetQueueInfo(type);
+                    exchange = "topic." + info.Exchange;
+                    queue = info.Queue;
                     channel.ExchangeDeclare(exchange, ExchangeType.Topic, durable: true);
                     channel.QueueDeclare(queue, durable: true, exclusive: false, autoDelete: false);
                     channel.QueueBind(queue, exchange, routeKey);
+                }
+                else
+                {
+                    var info = GetQueueInfo(type);
+                    exchange = "topic." + info.Exchange;
+                    queue = info.Queue;
                 }
             }
         }
@@ -150,7 +162,7 @@ namespace LightMessager.Helper
             }
         }
 
-        public static void FanoutEnsureQueue(IModel channel, Type messageType, out string exchange, out string queue, int delaySend = 0)
+        public static void FanoutEnsureQueue(IModel channel, Type messageType, out string exchange, int delaySend = 0)
         {
             var type = messageType;
             if (delaySend > 0)
@@ -158,7 +170,7 @@ namespace LightMessager.Helper
                 var type_name = messageType.IsGenericType ? messageType.GenericTypeArguments[0].Name : messageType.Name;
                 var key = string.Format("{0}{1}{2}", "fanout.", type_name, ".exchange.delay");
                 exchange = key;///同direct模式
-                queue = type_name + ".input.delay";
+                var queue = type_name + ".input.delay";
                 if (!dict_info_custom.ContainsKey(key))
                 {
                     GetQueueInfoForCustom(key, exchange, queue, "");
@@ -173,45 +185,44 @@ namespace LightMessager.Helper
             }
             else
             {
-                var info = GetQueueInfo(messageType);
-                exchange = info.Exchange;
-                queue = info.Queue;
                 if (!dict_info.ContainsKey(type))
                 {
+                    var info = GetQueueInfo(messageType);
+                    exchange = "fanout."+info.Exchange;
                     channel.ExchangeDeclare(exchange, ExchangeType.Fanout, durable: true);
-                    channel.QueueDeclare(info.Queue, durable: true, exclusive: false, autoDelete: false);
-                    channel.QueueBind(info.Queue, exchange, "");
+                }
+                else
+                {
+                    var info = GetQueueInfo(messageType);
+                    exchange = "fanout." + info.Exchange;
                 }
             }
         }
 
-        public static void FanoutEnsureQueue(IModel channel, ref string exchange, ref string queue, int delaySend = 0)
+        public static void FanoutEnsureQueue(IModel channel, ref string exchange, int delaySend = 0)
         {
             string realExchange = exchange;
             if (delaySend > 0)
             {
                 exchange = exchange + ".delay";
-                queue = queue + ".delay";
             }
-            var key = queue;//routekey不可用，exchange不唯一
+            var key = exchange;//routekey不可用,queue 几乎没用，exchange不唯一
             if (!dict_info_custom.ContainsKey(key))
             {
-                GetQueueInfoForCustom(key, exchange, queue, "");
+                GetQueueInfoForCustom(key, exchange, "", "");
                 channel.ExchangeDeclare(exchange, ExchangeType.Fanout, durable: true);
 
                 if (delaySend > 0)
                 {
+                    var queue = "delayqueue";
                     var args = new Dictionary<string, object>();
                     args.Add("x-message-ttl", delaySend);
                     args.Add("x-dead-letter-exchange", realExchange);
                     args.Add("x-dead-letter-routing-key", "");
                     channel.QueueDeclare(queue, durable: true, exclusive: false, autoDelete: false, arguments: args);
-                }
-                else
-                {
                     channel.QueueDeclare(queue, durable: true, exclusive: false, autoDelete: false);
+                    channel.QueueBind(queue, exchange, "");
                 }
-                channel.QueueBind(queue, exchange, "");
             }
         }
 

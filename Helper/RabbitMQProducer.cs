@@ -1,12 +1,9 @@
-﻿using LightMessager.DAL;
-using LightMessager.DAL.Model;
+﻿using LightMessager.Common;
 using LightMessager.Message;
 using LightMessager.Pool;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
-using NLog;
 using RabbitMQ.Client;
-using RabbitMQ.Client.Events;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -23,13 +20,12 @@ namespace LightMessager.Helper
         static readonly int default_retry_wait;
         static readonly int default_retry_count;
         static List<long> prepersist;
-        static ConcurrentQueue<BaseMessage> direct_queue;
-        static ConcurrentQueue<BaseMessage> topic_queue;
-        static ConcurrentQueue<BaseMessage> fanout_queue;
+        static BlockingQueue<BaseMessage> direct_queue;
+        static BlockingQueue<BaseMessage> topic_queue;
+        static BlockingQueue<BaseMessage> fanout_queue;
         static ConcurrentDictionary<Type, ObjectPool<IPooledWapper>> pools;
-        private static IMessageQueueHelper _message_queue_helper;
 
-        public RabbitMQProducer(IConfiguration configurationRoot, IMessageQueueHelper messageQueueHelper)
+        public RabbitMQProducer(IConfiguration configurationRoot)
         {
             factory = new ConnectionFactory();
             factory.UserName = configurationRoot.GetSection("LightMessager:UserName").Value; // "admin";
@@ -40,7 +36,18 @@ namespace LightMessager.Helper
             factory.AutomaticRecoveryEnabled = true;
             factory.NetworkRecoveryInterval = TimeSpan.FromSeconds(15);
             connection = factory.CreateConnection();
-            _message_queue_helper = messageQueueHelper;
+        }
+        public RabbitMQProducer(ConnectionModel connectionModel)
+        {
+            factory = new ConnectionFactory();
+            factory.UserName = connectionModel.UserName; // "admin";
+            factory.Password = connectionModel.Password; // "123456";
+            factory.VirtualHost = connectionModel.VirtualHost; // "/";
+            factory.HostName = connectionModel.HostName; // "127.0.0.1";
+            factory.Port = connectionModel.Port; // 5672;
+            factory.AutomaticRecoveryEnabled = connectionModel.AutomaticRecoveryEnabled;//true
+            factory.NetworkRecoveryInterval = connectionModel.NetworkRecoveryInterval;//15
+            connection = factory.CreateConnection();
         }
         static RabbitMQProducer()
         {
@@ -48,35 +55,37 @@ namespace LightMessager.Helper
             default_retry_wait = 1000; // 1秒
             default_retry_count = 3; // 消息重试最大3次
             prepersist = new List<long>();
-            direct_queue = new ConcurrentQueue<BaseMessage>();
-            topic_queue = new ConcurrentQueue<BaseMessage>();
-            fanout_queue = new ConcurrentQueue<BaseMessage>();
+            direct_queue = new BlockingQueue<BaseMessage>(1000);
+            topic_queue = new BlockingQueue<BaseMessage>(1000);
+            fanout_queue = new BlockingQueue<BaseMessage>(1000);
             pools = new ConcurrentDictionary<Type, ObjectPool<IPooledWapper>>();
 
             //开启轮询检测，扫描重试队列，重发消息
             new Thread(() =>
             {
-                // 先实现为spin的方式，后面考虑换成blockingqueue的方式
                 while (true)
                 {
                     BaseMessage send_item;
-                    while (direct_queue.TryDequeue(out send_item))
-                    {
-                        SendDirect(send_item);
-                    }
-
+                    direct_queue.Dequeue(out send_item);
+                    SendDirect(send_item);
+                }
+            }).Start();
+            new Thread(() =>
+            {
+                while (true)
+                {
                     BaseMessage pub_item;
-                    while (topic_queue.TryDequeue(out pub_item))
-                    {
-                        SendTopic(pub_item, pub_item.routeKey);
-                    }
-
+                    topic_queue.Dequeue(out pub_item);
+                    SendTopic(pub_item, pub_item.routeKey);
+                }
+            }).Start();
+            new Thread(() =>
+            {
+                while (true)
+                {
                     BaseMessage pub_item_fanout;
-                    while (fanout_queue.TryDequeue(out pub_item_fanout))
-                    {
-                        SendFanout(pub_item_fanout);
-                    }
-                    Thread.Sleep(1000 * 5);
+                    fanout_queue.Dequeue(out pub_item_fanout);
+                    SendFanout(pub_item_fanout);
                 }
             }).Start();
         }
@@ -118,9 +127,9 @@ namespace LightMessager.Helper
         /// <param name="queueName"></param>
         /// <param name="delaySend"></param>
         /// <returns></returns>
-        public bool FanoutSend(BaseMessage message, string exchangeName = "", string queueName = "", int delaySend = 0)
+        public bool FanoutSend(BaseMessage message, string exchangeName = "", int delaySend = 0)
         {
-            return SendFanout(message, exchangeName, queueName, delaySend);
+            return SendFanout(message, exchangeName, delaySend);
         }
 
         private static bool SendDirect(BaseMessage message, string exchangeName = "", string queueName = "", string routeKey = "", int delaySend = 0)
@@ -144,7 +153,8 @@ namespace LightMessager.Helper
 
                 var exchange = string.Empty;
                 var queue = string.Empty;
-                if (!string.IsNullOrEmpty(exchange) && !string.IsNullOrEmpty(queue) && !string.IsNullOrEmpty(routeKey))
+                var route_key = routeKey;
+                if (!string.IsNullOrEmpty(exchangeName) && !string.IsNullOrEmpty(queueName) && !string.IsNullOrEmpty(routeKey))
                 {
                     exchange = exchangeName;
                     queue = queueName;
@@ -153,9 +163,8 @@ namespace LightMessager.Helper
                 else
                 {
                     EnsureQueue.DirectEnsureQueue(channel, messageType, out exchange, out queue, delaySend);
+                    route_key = queue;
                 }
-
-                var route_key = queue;
                 var json = JsonConvert.SerializeObject(message);
                 var bytes = Encoding.UTF8.GetBytes(json);
                 var props = channel.CreateBasicProperties();
@@ -169,19 +178,10 @@ namespace LightMessager.Helper
                     // 数据库更新该条消息的状态信息
                     if (message.RetryCount_Publish < default_retry_count)
                     {
-                        var ok = _message_queue_helper.Update(
-                            message.MsgHash,
-                            fromStatus1: MsgStatus.Created, // 之前的状态只能是1 Created 或者2 Retry
-                            fromStatus2: MsgStatus.Retrying,
-                            toStatus: MsgStatus.Retrying);
-                        if (ok)
-                        {
-                            message.RetryCount_Publish += 1;
-                            message.LastRetryTime = DateTime.Now;
-                            direct_queue.Enqueue(message);
-                            return true;
-                        }
-                        throw new Exception("数据库update出现异常");
+                        message.RetryCount_Publish += 1;
+                        message.LastRetryTime = DateTime.Now;
+                        direct_queue.Enqueue(message);
+                        return true;
                     }
                     throw new Exception($"消息发送超过最大重试次数（{default_retry_count}次）");
                 }
@@ -238,20 +238,11 @@ namespace LightMessager.Helper
                 {
                     if (message.RetryCount_Publish < default_retry_count)
                     {
-                        var ok = _message_queue_helper.Update(
-                             message.MsgHash,
-                             fromStatus1: MsgStatus.Created, // 之前的状态只能是1 Created 或者2 Retry
-                             fromStatus2: MsgStatus.Retrying,
-                             toStatus: MsgStatus.Retrying);
-                        if (ok)
-                        {
-                            message.RetryCount_Publish += 1;
-                            message.LastRetryTime = DateTime.Now;
-                            message.routeKey = routeKey;
-                            topic_queue.Enqueue(message);
-                            return true;
-                        }
-                        throw new Exception("数据库update出现异常");
+                        message.RetryCount_Publish += 1;
+                        message.LastRetryTime = DateTime.Now;
+                        message.routeKey = routeKey;
+                        topic_queue.Enqueue(message);
+                        return true;
                     }
                     throw new Exception($"消息发送超过最大重试次数（{default_retry_count}次）");
                 }
@@ -259,7 +250,7 @@ namespace LightMessager.Helper
 
             return true;
         }
-        private static bool SendFanout(BaseMessage message, string exchangeName = "", string queueName = "", int delaySend = 0)
+        private static bool SendFanout(BaseMessage message, string exchangeName = "", int delaySend = 0)
         {
             if (string.IsNullOrWhiteSpace(message.Source))
             {
@@ -281,14 +272,14 @@ namespace LightMessager.Helper
                 // pooled.PreRecord(message.MsgHash);无需修改状态了
 
                 var exchange = string.Empty;
-                if (!string.IsNullOrEmpty(exchangeName) && !string.IsNullOrEmpty(queueName))
+                if (!string.IsNullOrEmpty(exchangeName))
                 {
                     exchange = exchangeName;
-                    EnsureQueue.FanoutEnsureQueue(channel, ref exchange, ref queueName, delaySend);
+                    EnsureQueue.FanoutEnsureQueue(channel, ref exchange, delaySend);
                 }
                 else
                 {
-                    EnsureQueue.FanoutEnsureQueue(channel, messageType, out exchange, out _, delaySend);
+                    EnsureQueue.FanoutEnsureQueue(channel, messageType, out exchange, delaySend);
                 }
                 var json = JsonConvert.SerializeObject(message);
                 var bytes = Encoding.UTF8.GetBytes(json);
@@ -301,19 +292,10 @@ namespace LightMessager.Helper
                 {
                     if (message.RetryCount_Publish < default_retry_count)
                     {
-                        var ok = _message_queue_helper.Update(
-                             message.MsgHash,
-                             fromStatus1: MsgStatus.Created, // 之前的状态只能是1 Created 或者2 Retry
-                             fromStatus2: MsgStatus.Retrying,
-                             toStatus: MsgStatus.Retrying);
-                        if (ok)
-                        {
-                            message.RetryCount_Publish += 1;
-                            message.LastRetryTime = DateTime.Now;
-                            fanout_queue.Enqueue(message);
-                            return true;
-                        }
-                        throw new Exception("数据库update出现异常");
+                        message.RetryCount_Publish += 1;
+                        message.LastRetryTime = DateTime.Now;
+                        fanout_queue.Enqueue(message);
+                        return true;
                     }
                     throw new Exception($"消息发送超过最大重试次数（{default_retry_count}次）");
                 }
@@ -326,7 +308,7 @@ namespace LightMessager.Helper
         {
             var pool = pools.GetOrAdd(
                 messageType,
-                t => new ObjectPool<IPooledWapper>(p => new PooledChannel(connection.CreateModel(), p, _message_queue_helper), 10));
+                t => new ObjectPool<IPooledWapper>(p => new PooledChannel(connection.CreateModel(), p), 10));
             return pool.Get() as PooledChannel;
         }
 
@@ -347,30 +329,7 @@ namespace LightMessager.Helper
                         prepersist.RemoveRange(0, 950);
                     }
                     prepersist.Add(msgHash);
-
-                    var model = _message_queue_helper.GetModelBy(msgHash);
-                    if (model != null)
-                    {
-                        return false;
-                    }
-                    else
-                    {
-                        var new_model = new MessageQueue
-                        {
-                            MsgHash = msgHash,
-                            MsgContent = message.Source,
-                            RetryCount = 0,
-                            CanBeRemoved = false,
-                            Status = MsgStatus.Created,
-                            CreatedTime = DateTime.Now
-                        };
-                        if (isFanout)
-                        {
-                            new_model.CanBeRemoved = true;
-                        }
-                        _message_queue_helper.Insert(new_model);
-                        return true;
-                    }
+                    return true;
                 }
             }
             else // RetryCount > 0
@@ -380,7 +339,7 @@ namespace LightMessager.Helper
             }
         }
 
-        public static long GenerateMessageIdFrom(string str)
+        private static long GenerateMessageIdFrom(string str)
         {
             return str.GetHashCode();
         }

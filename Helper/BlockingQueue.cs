@@ -67,5 +67,22 @@ namespace LightMessager.Helper
                 return item;
             }
         }
+
+        public void Dequeue(out T ob)
+        {
+            lock (_queue)
+            {
+                while (_queue.Count == 0)
+                {
+                    Monitor.Wait(_queue);
+                }
+                ob = _queue.Dequeue();
+                if (_queue.Count == _maxSize - 1)
+                {
+                    // wake up any blocked enqueue
+                    Monitor.PulseAll(_queue);
+                }
+            }
+        }
     }
 }
