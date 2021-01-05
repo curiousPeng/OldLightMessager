@@ -1,4 +1,5 @@
-﻿using LightMessager.DAL;
+﻿using LightMessager.Common;
+using LightMessager.DAL;
 using LightMessager.DAL.Model;
 using LightMessager.Message;
 using LightMessager.Pool;
@@ -42,6 +43,18 @@ namespace LightMessager.Helper
             factory.NetworkRecoveryInterval = TimeSpan.FromSeconds(15);
             connection = factory.CreateConnection();
             _message_queue_helper = messageQueueHelper;
+        }
+        public RabbitMQConsumer(ConnectionModel connectionModel)
+        {
+            factory = new ConnectionFactory();
+            factory.UserName = connectionModel.UserName; // "admin";
+            factory.Password = connectionModel.Password; // "123456";
+            factory.VirtualHost = connectionModel.VirtualHost; // "/";
+            factory.HostName = connectionModel.HostName; // "127.0.0.1";
+            factory.Port = connectionModel.Port; // 5672;
+            factory.AutomaticRecoveryEnabled = connectionModel.AutomaticRecoveryEnabled;//true
+            factory.NetworkRecoveryInterval = connectionModel.NetworkRecoveryInterval;//15
+            connection = factory.CreateConnection();
         }
         static RabbitMQConsumer()
         {

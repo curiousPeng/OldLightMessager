@@ -1,4 +1,5 @@
-﻿using LightMessager.DAL;
+﻿using LightMessager.Common;
+using LightMessager.DAL;
 using LightMessager.DAL.Model;
 using LightMessager.Message;
 using LightMessager.Pool;
@@ -23,9 +24,9 @@ namespace LightMessager.Helper
         static readonly int default_retry_wait;
         static readonly int default_retry_count;
         static List<long> prepersist;
-        static ConcurrentQueue<BaseMessage> direct_queue;
-        static ConcurrentQueue<BaseMessage> topic_queue;
-        static ConcurrentQueue<BaseMessage> fanout_queue;
+        static BlockingQueue<BaseMessage> direct_queue;
+        static BlockingQueue<BaseMessage> topic_queue;
+        static BlockingQueue<BaseMessage> fanout_queue;
         static ConcurrentDictionary<Type, ObjectPool<IPooledWapper>> pools;
         private static IMessageQueueHelper _message_queue_helper;
 
@@ -42,41 +43,55 @@ namespace LightMessager.Helper
             connection = factory.CreateConnection();
             _message_queue_helper = messageQueueHelper;
         }
+        public RabbitMQProducer(ConnectionModel connectionModel)
+        {
+            factory = new ConnectionFactory();
+            factory.UserName = connectionModel.UserName; // "admin";
+            factory.Password = connectionModel.Password; // "123456";
+            factory.VirtualHost = connectionModel.VirtualHost; // "/";
+            factory.HostName = connectionModel.HostName; // "127.0.0.1";
+            factory.Port = connectionModel.Port; // 5672;
+            factory.AutomaticRecoveryEnabled = connectionModel.AutomaticRecoveryEnabled;//true
+            factory.NetworkRecoveryInterval = connectionModel.NetworkRecoveryInterval;//15
+            connection = factory.CreateConnection();
+        }
         static RabbitMQProducer()
         {
             prepersist_count = 0;
             default_retry_wait = 1000; // 1秒
             default_retry_count = 3; // 消息重试最大3次
             prepersist = new List<long>();
-            direct_queue = new ConcurrentQueue<BaseMessage>();
-            topic_queue = new ConcurrentQueue<BaseMessage>();
-            fanout_queue = new ConcurrentQueue<BaseMessage>();
+            direct_queue = new BlockingQueue<BaseMessage>(1000);
+            topic_queue = new BlockingQueue<BaseMessage>(1000);
+            fanout_queue = new BlockingQueue<BaseMessage>(1000);
             pools = new ConcurrentDictionary<Type, ObjectPool<IPooledWapper>>();
 
             //开启轮询检测，扫描重试队列，重发消息
             new Thread(() =>
             {
-                // 先实现为spin的方式，后面考虑换成blockingqueue的方式
                 while (true)
                 {
                     BaseMessage send_item;
-                    while (direct_queue.TryDequeue(out send_item))
-                    {
-                        SendDirect(send_item);
-                    }
-
+                    direct_queue.Dequeue(out send_item);
+                    SendDirect(send_item);
+                }
+            }).Start();
+            new Thread(() =>
+            {
+                while (true)
+                {
                     BaseMessage pub_item;
-                    while (topic_queue.TryDequeue(out pub_item))
-                    {
-                        SendTopic(pub_item, pub_item.routeKey);
-                    }
-
+                    topic_queue.Dequeue(out pub_item);
+                    SendTopic(pub_item, pub_item.routeKey);
+                }
+            }).Start();
+            new Thread(() =>
+            {
+                while (true)
+                {
                     BaseMessage pub_item_fanout;
-                    while (fanout_queue.TryDequeue(out pub_item_fanout))
-                    {
-                        SendFanout(pub_item_fanout);
-                    }
-                    Thread.Sleep(1000 * 5);
+                    fanout_queue.Dequeue(out pub_item_fanout);
+                    SendFanout(pub_item_fanout);
                 }
             }).Start();
         }

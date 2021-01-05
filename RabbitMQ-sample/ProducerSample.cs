@@ -1,4 +1,5 @@
-﻿using LightMessager.Helper;
+﻿using LightMessager.Common;
+using LightMessager.Helper;
 using LightMessager.RabbitMQ_sample.MessageModel;
 using System;
 using System.Collections.Generic;
@@ -6,8 +7,23 @@ using System.Text;
 
 namespace LightMessager.RabbitMQ_sample
 {
-   public class ProducerSample
+    public class ProducerSample
     {
+        private RabbitMQProducer rabbitMQProducer;
+        public ProducerSample()
+        {
+            var conn = new ConnectionModel()
+            {
+                AutomaticRecoveryEnabled = true,
+                HostName = "127.0.0.1",
+                NetworkRecoveryInterval = TimeSpan.FromSeconds(15),
+                Password = "123456",
+                Port = 5672,
+                UserName = "admin",
+                VirtualHost = "/"
+            };
+            rabbitMQProducer = new RabbitMQProducer(conn);
+        }
         public void DirectSendMsg()
         {
             var send_msg = new NewOrderMessage
@@ -20,15 +36,14 @@ namespace LightMessager.RabbitMQ_sample
                 Source = Guid.NewGuid().ToString()
             };
             ///direct模式
-            RabbitMQHelper.Send(send_msg);
+            rabbitMQProducer.DirectSend(send_msg);
         }
-
         public void TopicSendMsg()
         {
             var send_msg = new NewOrderMessage
             {
                 CreatedTime = DateTime.Now,
-                OrderNum = "111111",
+                OrderNum = "22222",
                 PayType = 1,
                 Price = 100M,
                 ProductCode = 1,
@@ -36,9 +51,25 @@ namespace LightMessager.RabbitMQ_sample
             };
             ///Topic模式
             var routingKey = "com.mq.rabbit.order";//这个根据自己定义，路由键，客户端消费需要订阅，匹配这个路由键才可以消费到。
-            RabbitMQHelper.Publish(send_msg,routingKey);
+            rabbitMQProducer.TopicSend(send_msg, routingKey);
         }
         public void FanoutSendMsg()
+        {
+            var send_msg = new NewOrderMessage
+            {
+                CreatedTime = DateTime.Now,
+                OrderNum = "33333",
+                PayType = 1,
+                Price = 100M,
+                ProductCode = 1,
+                Source = Guid.NewGuid().ToString()
+            };
+            ///fanout模式
+            rabbitMQProducer.FanoutSend(send_msg);
+        }
+
+
+        public void DirecSendMsgWihtExchange()
         {
             var send_msg = new NewOrderMessage
             {
@@ -49,8 +80,38 @@ namespace LightMessager.RabbitMQ_sample
                 ProductCode = 1,
                 Source = Guid.NewGuid().ToString()
             };
+            ///direct模式
+            rabbitMQProducer.DirectSend(send_msg, "directExchange", "directOrder", "order1");
+        }
+        public void TopicSendMsgWihtExchange()
+        {
+            var send_msg = new NewOrderMessage
+            {
+                CreatedTime = DateTime.Now,
+                OrderNum = "22222",
+                PayType = 1,
+                Price = 100M,
+                ProductCode = 1,
+                Source = Guid.NewGuid().ToString()
+            };
+            ///Topic模式
+            var routingKey = "com.mq.rabbit.order";//这个根据自己定义，路由键，客户端消费需要订阅，匹配这个路由键才可以消费到。
+            rabbitMQProducer.TopicSend(send_msg, routingKey, "topicExchange", "topicOrder");
+        }
+
+        public void FanoutSendMsgWihtExchange()
+        {
+            var send_msg = new NewOrderMessage
+            {
+                CreatedTime = DateTime.Now,
+                OrderNum = "33333",
+                PayType = 1,
+                Price = 100M,
+                ProductCode = 1,
+                Source = Guid.NewGuid().ToString()
+            };
             ///fanout模式
-            RabbitMQHelper.FanoutPublish(send_msg);
+            rabbitMQProducer.FanoutSend(send_msg, "fanoutExchange");
         }
     }
 }
