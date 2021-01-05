@@ -220,7 +220,6 @@ namespace LightMessager.Helper
                     args.Add("x-dead-letter-exchange", realExchange);
                     args.Add("x-dead-letter-routing-key", "");
                     channel.QueueDeclare(queue, durable: true, exclusive: false, autoDelete: false, arguments: args);
-                    channel.QueueDeclare(queue, durable: true, exclusive: false, autoDelete: false);
                     channel.QueueBind(queue, exchange, "");
                 }
             }
