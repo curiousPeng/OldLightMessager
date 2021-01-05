@@ -9,6 +9,6 @@ namespace LightMessager.Helper
     {
         bool DirectSend(BaseMessage message, string exchangeName, string queueName, string routeKey, int delaySend = 0);
         bool TopicSend(BaseMessage message, string exchangeName, string queueName, string routeKey, int delaySend = 0);
-        bool FanoutSend(BaseMessage message, string exchangeName, string queueName, int delaySend = 0);
+        bool FanoutSend(BaseMessage message, string exchangeName, int delaySend = 0);
     }
 }

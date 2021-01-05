@@ -41,14 +41,20 @@ namespace LightMessager.Helper
             }
             else
             {
-                var info = GetQueueInfo(type);
-                exchange = info.Exchange;
-                queue = info.Queue;
                 if (!dict_info.ContainsKey(type))
                 {
+                    var info = GetQueueInfo(type);//不能放外面，这个方法会往dict_info里面记录，否则永远建不起exchange
+                    exchange = info.Exchange;
+                    queue = info.Queue;
                     channel.ExchangeDeclare(exchange, ExchangeType.Direct, durable: true);
                     channel.QueueDeclare(queue, durable: true, exclusive: false, autoDelete: false);
                     channel.QueueBind(queue, exchange, queue);
+                }
+                else
+                {
+                    var info = GetQueueInfo(type);
+                    exchange = info.Exchange;
+                    queue = info.Queue;
                 }
             }
         }
@@ -63,7 +69,7 @@ namespace LightMessager.Helper
                 queue = queue + ".delay";
             }
             key = queue;///为什么这儿是queue，而上面是exchange，因为上面是工具定义的，
-                        ///只要是同一个消息结构，queueName是定死了，所以直接返回Exchange就行了
+                        ///只要是同一个消息结构，上面的queueName是定死了，所以直接返回Exchange就行了
                         ///而下面是用户自定义的queue，同一个exchange下可以有多个不同的queue，绑定就不同
             if (!dict_info_custom.ContainsKey(key))
             {
@@ -109,14 +115,20 @@ namespace LightMessager.Helper
             }
             else
             {
-                var info = GetQueueInfo(type);
-                exchange = "topic." + info.Exchange;
-                queue = info.Queue;
                 if (!dict_info.ContainsKey(type))
                 {
+                    var info = GetQueueInfo(type);
+                    exchange = "topic." + info.Exchange;
+                    queue = info.Queue;
                     channel.ExchangeDeclare(exchange, ExchangeType.Topic, durable: true);
                     channel.QueueDeclare(queue, durable: true, exclusive: false, autoDelete: false);
                     channel.QueueBind(queue, exchange, routeKey);
+                }
+                else
+                {
+                    var info = GetQueueInfo(type);
+                    exchange = "topic." + info.Exchange;
+                    queue = info.Queue;
                 }
             }
         }
@@ -208,7 +220,6 @@ namespace LightMessager.Helper
                     args.Add("x-dead-letter-exchange", realExchange);
                     args.Add("x-dead-letter-routing-key", "");
                     channel.QueueDeclare(queue, durable: true, exclusive: false, autoDelete: false, arguments: args);
-                    channel.QueueDeclare(queue, durable: true, exclusive: false, autoDelete: false);
                     channel.QueueBind(queue, exchange, "");
                 }
             }

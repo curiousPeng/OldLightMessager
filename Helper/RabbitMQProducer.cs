@@ -118,9 +118,9 @@ namespace LightMessager.Helper
         /// <param name="queueName"></param>
         /// <param name="delaySend"></param>
         /// <returns></returns>
-        public bool FanoutSend(BaseMessage message, string exchangeName = "", string queueName = "", int delaySend = 0)
+        public bool FanoutSend(BaseMessage message, string exchangeName = "", int delaySend = 0)
         {
-            return SendFanout(message, exchangeName, queueName, delaySend);
+            return SendFanout(message, exchangeName, delaySend);
         }
 
         private static bool SendDirect(BaseMessage message, string exchangeName = "", string queueName = "", string routeKey = "", int delaySend = 0)
@@ -259,7 +259,7 @@ namespace LightMessager.Helper
 
             return true;
         }
-        private static bool SendFanout(BaseMessage message, string exchangeName = "", string queueName = "", int delaySend = 0)
+        private static bool SendFanout(BaseMessage message, string exchangeName = "", int delaySend = 0)
         {
             if (string.IsNullOrWhiteSpace(message.Source))
             {
@@ -281,7 +281,7 @@ namespace LightMessager.Helper
                 // pooled.PreRecord(message.MsgHash);无需修改状态了
 
                 var exchange = string.Empty;
-                if (!string.IsNullOrEmpty(exchangeName) && !string.IsNullOrEmpty(queueName))
+                if (!string.IsNullOrEmpty(exchangeName))
                 {
                     exchange = exchangeName;
                     EnsureQueue.FanoutEnsureQueue(channel, ref exchange, delaySend);
