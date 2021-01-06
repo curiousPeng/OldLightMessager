@@ -76,7 +76,7 @@ namespace LightMessager.Helper
                 {
                     BaseMessage pub_item;
                     topic_queue.Dequeue(out pub_item);
-                    SendTopic(pub_item, pub_item.routeKey);
+                    SendTopic(pub_item);
                 }
             }).Start();
             new Thread(() =>
@@ -99,9 +99,9 @@ namespace LightMessager.Helper
         /// <param name="routeKey">路由键，不定义就默认使用队列名做路由键</param>
         /// <param name="delaySend">延迟多少毫秒发送消息,一般不低于5000</param>
         /// <returns>发送成功返回true，否则返回false</returns>
-        public bool DirectSend(BaseMessage message, string exchangeName = "", string queueName = "", string routeKey = "", int delaySend = 0)
+        public bool DirectSend(BaseMessage message, int delaySend = 0)
         {
-            return SendDirect(message, exchangeName, queueName, routeKey, delaySend);
+            return SendDirect(message, delaySend);
         }
 
         /// <summary>
@@ -113,9 +113,9 @@ namespace LightMessager.Helper
         /// <param name="routeKey">路由键</param>
         /// <param name="delaySend">延迟多少毫秒发布消息</param>
         /// <returns>发布成功返回true，否则返回false</returns>
-        public bool TopicSend(BaseMessage message, string routeKey, string exchangeName = "", string queueName = "", int delaySend = 0)
+        public bool TopicSend(BaseMessage message, int delaySend = 0)
         {
-            return SendTopic(message, routeKey, exchangeName, queueName, delaySend);
+            return SendTopic(message, delaySend);
         }
 
         /// <summary>
@@ -127,12 +127,12 @@ namespace LightMessager.Helper
         /// <param name="queueName"></param>
         /// <param name="delaySend"></param>
         /// <returns></returns>
-        public bool FanoutSend(BaseMessage message, string exchangeName = "", int delaySend = 0)
+        public bool FanoutSend(BaseMessage message, int delaySend = 0)
         {
-            return SendFanout(message, exchangeName, delaySend);
+            return SendFanout(message, delaySend);
         }
 
-        private static bool SendDirect(BaseMessage message, string exchangeName = "", string queueName = "", string routeKey = "", int delaySend = 0)
+        private static bool SendDirect(BaseMessage message, int delaySend = 0)
         {
             if (string.IsNullOrWhiteSpace(message.Source))
             {
@@ -153,12 +153,12 @@ namespace LightMessager.Helper
 
                 var exchange = string.Empty;
                 var queue = string.Empty;
-                var route_key = routeKey;
-                if (!string.IsNullOrEmpty(exchangeName) && !string.IsNullOrEmpty(queueName) && !string.IsNullOrEmpty(routeKey))
+                var route_key = message.routeKey;
+                if (!string.IsNullOrEmpty(message.exchangeName) && !string.IsNullOrEmpty(message.queueName) && !string.IsNullOrEmpty(message.routeKey))
                 {
-                    exchange = exchangeName;
-                    queue = queueName;
-                    EnsureQueue.DirectEnsureQueue(channel, ref exchange, ref queue, routeKey, delaySend);
+                    exchange = message.exchangeName;
+                    queue = message.queueName;
+                    EnsureQueue.DirectEnsureQueue(channel, ref exchange, ref queue, message.routeKey, delaySend);
                 }
                 else
                 {
@@ -189,14 +189,14 @@ namespace LightMessager.Helper
 
             return true;
         }
-        private static bool SendTopic(BaseMessage message, string routeKey, string exchangeName = "", string queueName = "", int delaySend = 0)
+        private static bool SendTopic(BaseMessage message, int delaySend = 0)
         {
             if (string.IsNullOrWhiteSpace(message.Source))
             {
                 throw new ArgumentNullException("message.Source");
             }
 
-            if (string.IsNullOrWhiteSpace(routeKey))
+            if (string.IsNullOrWhiteSpace(message.routeKey))
             {
                 throw new ArgumentNullException("routeKey");
             }
@@ -215,15 +215,15 @@ namespace LightMessager.Helper
 
                 var exchange = string.Empty;
                 var queue = string.Empty;
-                if (!string.IsNullOrEmpty(exchangeName) && !string.IsNullOrEmpty(queueName))
+                if (!string.IsNullOrEmpty(message.exchangeName) && !string.IsNullOrEmpty(message.queueName))
                 {
-                    exchange = exchangeName;
-                    queue = queueName;
-                    EnsureQueue.TopicEnsureQueue(channel, routeKey, ref exchange, ref queue, delaySend);
+                    exchange = message.exchangeName;
+                    queue = message.queueName;
+                    EnsureQueue.TopicEnsureQueue(channel, message.routeKey, ref exchange, ref queue, delaySend);
                 }
                 else
                 {
-                    EnsureQueue.TopicEnsureQueue(channel, messageType, routeKey, out exchange, out queue, delaySend);
+                    EnsureQueue.TopicEnsureQueue(channel, messageType, message.routeKey, out exchange, out queue, delaySend);
                 }
 
                 var json = JsonConvert.SerializeObject(message);
@@ -231,7 +231,7 @@ namespace LightMessager.Helper
                 var props = channel.CreateBasicProperties();
                 props.ContentType = "text/plain";
                 props.DeliveryMode = 2;
-                channel.BasicPublish(exchange, routeKey, props, bytes);
+                channel.BasicPublish(exchange, message.routeKey, props, bytes);
                 var time_out = Math.Max(default_retry_wait, message.RetryCount_Publish * 2 /*2倍往上扩大，防止出现均等*/ * 1000);
                 var ret = channel.WaitForConfirms(TimeSpan.FromMilliseconds(time_out));
                 if (!ret)
@@ -240,7 +240,6 @@ namespace LightMessager.Helper
                     {
                         message.RetryCount_Publish += 1;
                         message.LastRetryTime = DateTime.Now;
-                        message.routeKey = routeKey;
                         topic_queue.Enqueue(message);
                         return true;
                     }
@@ -250,7 +249,7 @@ namespace LightMessager.Helper
 
             return true;
         }
-        private static bool SendFanout(BaseMessage message, string exchangeName = "", int delaySend = 0)
+        private static bool SendFanout(BaseMessage message, int delaySend = 0)
         {
             if (string.IsNullOrWhiteSpace(message.Source))
             {
@@ -272,9 +271,9 @@ namespace LightMessager.Helper
                 // pooled.PreRecord(message.MsgHash);无需修改状态了
 
                 var exchange = string.Empty;
-                if (!string.IsNullOrEmpty(exchangeName))
+                if (!string.IsNullOrEmpty(message.exchangeName))
                 {
-                    exchange = exchangeName;
+                    exchange = message.exchangeName;
                     EnsureQueue.FanoutEnsureQueue(channel, ref exchange, delaySend);
                 }
                 else

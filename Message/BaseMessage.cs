@@ -29,7 +29,17 @@ namespace LightMessager.Message
         /// 重试的时候会用到
         /// </summary>
         [JsonIgnore]
-        internal string routeKey { set; get; }
+        public string routeKey { set; get; }
+        /// <summary>
+        /// 重试的时候会用到
+        /// </summary>
+        [JsonIgnore]
+        public string exchangeName { set; get; }
+        /// <summary>
+        /// 重试的时候会用到
+        /// </summary>
+        [JsonIgnore]
+        public string queueName { set; get; }
 
         public DateTime CreatedTime { set; get; }
     }

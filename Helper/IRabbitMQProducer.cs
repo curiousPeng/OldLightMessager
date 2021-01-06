@@ -7,8 +7,8 @@ namespace LightMessager.Helper
 {
     public interface IRabbitMQProducer
     {
-        bool DirectSend(BaseMessage message, string exchangeName, string queueName, string routeKey, int delaySend = 0);
-        bool TopicSend(BaseMessage message, string exchangeName, string queueName, string routeKey, int delaySend = 0);
-        bool FanoutSend(BaseMessage message, string exchangeName, int delaySend = 0);
+        bool DirectSend(BaseMessage message, int delaySend = 0);
+        bool TopicSend(BaseMessage message, int delaySend = 0);
+        bool FanoutSend(BaseMessage message, int delaySend = 0);
     }
 }

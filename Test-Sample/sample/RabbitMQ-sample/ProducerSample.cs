@@ -47,11 +47,10 @@ namespace LightMessager.RabbitMQ_sample
                 PayType = 1,
                 Price = 100M,
                 ProductCode = 1,
-                Source = Guid.NewGuid().ToString()
+                Source = Guid.NewGuid().ToString(),
+                routeKey = "com.mq.rabbit.order"//这个根据自己定义，路由键，客户端消费需要订阅，匹配这个路由键才可以消费到。
             };
-            ///Topic模式
-            var routingKey = "com.mq.rabbit.order";//这个根据自己定义，路由键，客户端消费需要订阅，匹配这个路由键才可以消费到。
-            rabbitMQProducer.TopicSend(send_msg,routingKey);
+            rabbitMQProducer.TopicSend(send_msg);
         }
         public void FanoutSendMsg()
         {
@@ -78,10 +77,13 @@ namespace LightMessager.RabbitMQ_sample
                 PayType = 1,
                 Price = 100M,
                 ProductCode = 1,
-                Source = Guid.NewGuid().ToString()
+                Source = Guid.NewGuid().ToString(),
+                exchangeName = "directExchange",
+                queueName = "directOrder",
+                routeKey = "order1"
             };
             ///direct模式
-            rabbitMQProducer.DirectSend(send_msg,"directExchange", "directOrder", "order1");
+            rabbitMQProducer.DirectSend(send_msg);
         }
         public void TopicSendMsgWihtExchange()
         {
@@ -92,11 +94,14 @@ namespace LightMessager.RabbitMQ_sample
                 PayType = 1,
                 Price = 100M,
                 ProductCode = 1,
-                Source = Guid.NewGuid().ToString()
+                Source = Guid.NewGuid().ToString(),
+                exchangeName = "topicExchange",
+                queueName = "topicOrder",
+                routeKey = "com.mq.rabbit.order"
             };
             ///Topic模式
-            var routingKey = "com.mq.rabbit.order";//这个根据自己定义，路由键，客户端消费需要订阅，匹配这个路由键才可以消费到。
-            rabbitMQProducer.TopicSend(send_msg, routingKey,"topicExchange","topicOrder");
+            //var routingKey = "com.mq.rabbit.order";//这个根据自己定义，路由键，客户端消费需要订阅，匹配这个路由键才可以消费到。
+            rabbitMQProducer.TopicSend(send_msg);
         }
 
         public void FanoutSendMsgWihtExchange()
@@ -108,10 +113,11 @@ namespace LightMessager.RabbitMQ_sample
                 PayType = 1,
                 Price = 100M,
                 ProductCode = 1,
-                Source = Guid.NewGuid().ToString()
+                Source = Guid.NewGuid().ToString(),
+                exchangeName = "fanoutExchange"
             };
             ///fanout模式
-            rabbitMQProducer.FanoutSend(send_msg,"fanoutExchange");
+            rabbitMQProducer.FanoutSend(send_msg);
         }
     }
 }
