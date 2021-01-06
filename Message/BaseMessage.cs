@@ -26,10 +26,20 @@ namespace LightMessager.Message
         internal DateTime LastRetryTime { set; get; }
 
         /// <summary>
-        /// 重试的时候会用到
+        /// 重试的时候会用到,topic消息必填，因为加了JsonIgnore,consumer的时候必须自己定义
         /// </summary>
         [JsonIgnore]
         internal string routeKey { set; get; }
+        /// <summary>
+        /// 重试的时候会用到
+        /// </summary>
+        [JsonIgnore]
+        internal string exchangeName { set; get; }
+        /// <summary>
+        /// 重试的时候会用到
+        /// </summary>
+        [JsonIgnore]
+        internal string queueName { set; get; }
 
         public DateTime CreatedTime { set; get; }
     }
