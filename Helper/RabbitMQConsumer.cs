@@ -58,7 +58,6 @@ namespace LightMessager.Helper
         /// </summary>
         /// <typeparam name="TMessage">消息类型</typeparam>
         /// <typeparam name="THandler">消息处理器类型</typeparam>
-        /// <param name="redeliveryCheck">是否开启重发确认；如果消息处理器逻辑已经实现为幂等则不需要开启以便节省计算资源，否则请打开该选项</param>
         public void RegisterDirectHandler<TMessage, THandler>(string exchangeName = "", string queueName = "", string routeKey = "")
             where THandler : BaseHandleMessages<TMessage>
             where TMessage : BaseMessage
@@ -115,9 +114,6 @@ namespace LightMessager.Helper
         /// </summary>
         /// <typeparam name="TMessage">消息类型</typeparam>
         /// <typeparam name="THandler">消息处理器类型</typeparam>
-        /// <param name="subscriberName">订阅器的名称</param>
-        /// <param name="redeliveryCheck">是否开启重发确认；如果消息处理器逻辑已经实现为幂等则不需要开启以便节省计算资源，否则请打开该选项</param>
-        /// <param name="subscribePatterns">订阅器支持的消息模式</param>
         public void RegisterTopicHandler<TMessage, THandler>(string routeKey, string exchangeName = "", string queueName = "")
             where THandler : BaseHandleMessages<TMessage>
             where TMessage : BaseMessage
