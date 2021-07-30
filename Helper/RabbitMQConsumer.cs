@@ -21,7 +21,7 @@ namespace LightMessager.Helper
     {
         static ConnectionFactory factory;
         static IConnection connection;
-        static readonly ushort prefetch_count;
+        static readonly ushort prefetch_count=50;
         static Logger _logger = LogManager.GetLogger("RabbitMQHelper");
 
         public RabbitMQConsumer(IConfiguration configurationRoot)
@@ -47,10 +47,6 @@ namespace LightMessager.Helper
             factory.AutomaticRecoveryEnabled = connectionModel.AutomaticRecoveryEnabled;//true
             factory.NetworkRecoveryInterval = connectionModel.NetworkRecoveryInterval;//15
             connection = factory.CreateConnection();
-        }
-        static RabbitMQConsumer()
-        {
-            prefetch_count = 100;
         }
 
         /// <summary>
